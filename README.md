@@ -57,7 +57,7 @@ RPI4+GPS+RTCで**NTPサーバー**ができました。
         dtoverlay=uart4
         dtoverlay=uart5
         ```
-    1. pps信号をGPIO18ピンで受信できるように変更
+    1. pps信号をGPIO16ピンで受信できるように変更
         ```
         sudo vi /boot/firmware/config.txt
         
