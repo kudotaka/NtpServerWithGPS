@@ -117,191 +117,54 @@ RPI4+GPS+RTCで**NTPサーバー**ができました。
         ```
     1. gps受信機が送信するデータを限定
         
-        dotnetアプリを作った
+        - [dotnetコンソールアプリを作った](https://github.com/kudotaka/GPS_SetParam_MT)
+
+        dotnetアプリでやっていることは以下。
         ```
-        SetGpsParam.csproj
+        $PMTK353,1,1,1,0,0
+        $PMTK351,1
+        $PMTK314,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        $PMTK101
+        ```
+        dotnetコンソールアプリをコピーとお試し実行。
+        ```
+        sudo -i
+        chmod +x /sbin/SetGpsParam//SetGpsParam
+
+        ls -la /sbin/SetGpsParam/*
+          -rwxr-xr-x 1 root root 76151107 Oct 15 12:48 /sbin/SetGpsParam/SetGpsParam
+          -rw-r--r-- 1 root root    11584 Oct 15 12:48 /sbin/SetGpsParam/SetGpsParam.pdb
+          -rw-r--r-- 1 root root    14368 Oct 15 12:48 /sbin/SetGpsParam/libSystem.IO.Ports.Native.so
         
-        <Project Sdk="Microsoft.NET.Sdk">
+        /sbin/SetGpsParam/SetGpsParam --version
+        Version: 0.3.0-bata
 
-          <PropertyGroup>
-            <OutputType>Exe</OutputType>
-            <TargetFramework>net6.0</TargetFramework>
-            <ImplicitUsings>enable</ImplicitUsings>
-            <Nullable>enable</Nullable>
-          </PropertyGroup>
-
-          <ItemGroup>
-            <PackageReference Include="Iot.Device.Bindings" Version="3.0.0" />
-          </ItemGroup>
-
-        </Project>
-        ```
-        ```
-        Program.cs
-
-        using System.IO.Ports;
-        using System.Text;
-        using Iot.Device.MT3333;
-
-        string VersionValue = "0.1.0-bata";
-
-        //string CommandGetQRelease = "$PMTK605*31\r\n";
-        string CommandSetGnssSearchMode = "$PMTK353,1,0,1,0,0*2B\r\n";
-        string CommandSetSupportQzss    = "$PMTK351,1*28\r\n";
-        string CommandSetNmeaOutput     = "$PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*28\r\n";
-        //string CommandSetNmeaBaudrate   = "$PMTK251,9600*17\r\n";
-
-        // string[] args
-        if (args.Length == 0)
-        {
-            Console.WriteLine("Please enter a string argument.");
-            Console.WriteLine("Usage: SetGpsParam /dev/ttyAMA<num>");
-            Console.WriteLine("Usage: SetGpsParam --version, -V");
-            return;
-        }
-
-        string args0Value = args[0];
-        if (args0Value == "--version" || args0Value == "-V")
-        {
-            Console.WriteLine("Version: {0}", VersionValue);
-            return;
-        }
-
-        using SerialPort serialPort = new SerialPort(args0Value, 9600, Parity.None, 8, StopBits.One)
-        {
-            Encoding = Encoding.ASCII,
-            ReadTimeout = 1000,
-            WriteTimeout = 1000
-        };
-
-        try
-        {
-            serialPort.Open();
-            using MT3333 gps = new(serialPort.BaseStream, true);
-
-            Thread.Sleep(1000);
-
-            gps.SendRequest(CommandSetGnssSearchMode);
-            Console.WriteLine("Command:SetGnssSearchMode");
-            Thread.Sleep(1000);
-            gps.SendRequest(CommandSetSupportQzss);
-            Console.WriteLine("Command:SetSupportQzss");
-            Thread.Sleep(1000);
-            gps.SendRequest(CommandSetNmeaOutput);
-            Console.WriteLine("Command:SetNmeaOutput");
-            Thread.Sleep(1000);
-
-        }
-        catch (IOException e)
-        {
-            Console.WriteLine("GPS couldn't be read");
-            Console.WriteLine(e.Message);
-            Console.WriteLine(e.InnerException?.Message);
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine("SYSTEM couldn't be response");
-            Console.WriteLine(e.Message);
-            Console.WriteLine(e.InnerException?.Message);
-        }
-        ```
-        ```
-        Mt3333.cs
-
-        using System.IO.Ports;
-        using System.Text;
-
-        namespace Iot.Device.MT3333
-        {
-            public sealed class MT3333 : IDisposable
-            {
-                private bool _shouldDispose = false;
-                private SerialPort? _serialPort;
-                private Stream _serialPortStream;
-
-                public MT3333(Stream stream, bool shouldDispose)
-                {
-                    _serialPortStream = stream ?? throw new ArgumentNullException(nameof(stream));
-                    _shouldDispose = shouldDispose;
-                }
-
-                public MT3333(string uartDevice)
-                {
-                    if (uartDevice is not { Length: > 0 })
-                    {
-                        throw new ArgumentException($"{nameof(uartDevice)} can't be null or empty.", nameof(uartDevice));
-                    }
-
-                    // create serial port using the setting acc. to datasheet, pg. 7, sec. general settings
-                    _serialPort = new SerialPort(uartDevice, 9600, Parity.None, 8, StopBits.One)
-                    {
-                        Encoding = Encoding.ASCII,
-                        ReadTimeout = 1000,
-                        WriteTimeout = 1000
-                    };
-
-                    _serialPort.Open();
-                    _serialPortStream = _serialPort.BaseStream;
-                    _shouldDispose = true;
-                }
-
-                public void SendRequest(string request)
-                {
-                    byte[] data = System.Text.Encoding.ASCII.GetBytes(request);
-                    try
-                    {
-                        _serialPortStream.Write(data, 0, data.Length);
-                    }
-                    catch (Exception e)
-                    {
-                        throw new IOException("Sensor communication failed", e);
-                    }
-                }
-
-                /// <inheritdoc cref="IDisposable" />
-                public void Dispose()
-                {
-                    if (_shouldDispose)
-                    {
-                        _serialPortStream?.Dispose();
-                        _serialPortStream = null!;
-                    }
-
-                    if (_serialPort?.IsOpen ?? false)
-                    {
-                        _serialPort.Close();
-                    }
-
-                    _serialPort?.Dispose();
-                    _serialPort = null;
-                }
-
-            }
-        }
-        ```
-        ```
-        dotnet build
-
-        dotnet publish --runtime linux-arm64 --self-contained /p:PublishSingleFile=true
-        ```
-        ```
-        sudo apt install dotnet-runtime-6.0
-
-        chmod +x ./SetGpsParam
-
-        ./SetGpsParam --version
-        Version: 0.1.0-bata
-
-        ./SetGpsParam /dev/ttyAMA1
+        /sbin/SetGpsParam/SetGpsParam /dev/ttyAMA1
         Command:SetGnssSearchMode
         Command:SetSupportQzss
         Command:SetNmeaOutput
+        Command:CommandHotStart
         ```
-        dotnetアプリでやっていることは以下。
+        起動時にdotnetコンソールアプリを実行。
         ```
-        $PMTK353,1,0,1,0,0
-        $PMTK351,1
-        $PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        vi /etc/systemd/system/set-gps-param.service
+        
+        [Unit]
+        After=local-fs.target
+        Before=rsyslog.service
+
+        [Service]
+        WorkingDirectory=/sbin/SetGpsParam/
+        ExecStart=/sbin/SetGpsParam/SetGpsParam /dev/ttyAMA1
+        Type=oneshot
+        RemainAfterExit=yes
+
+        [Install]
+        WantedBy=multi-user.target
+        ```
+        ```
+        systemctl daemon-reload
+        systemctl enable set-gps-param
         ```
 
 1. NTPサーバーのインストール、設定
@@ -383,7 +246,7 @@ RPI4+GPS+RTCで**NTPサーバー**ができました。
 1. 状態観察
     1. 状態確認(6時間以上起動後)
         ```
-        sudo ntpq -p
+        ntpq -p
         
         　　　　remote         refid    st t when poll reach   delay   offset  jitter
         ==============================================================================
